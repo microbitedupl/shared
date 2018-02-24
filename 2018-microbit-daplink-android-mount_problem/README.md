@@ -13,31 +13,31 @@ Some initial analysis of filesystem bytes are provided below. Seems valid FAT16 
 ```
 00000000: EB 3C 90 4D 53 44 30 53  34 2E 31 00 02 08 01 00  .<.MSD0S4.1.....
 
-          ^^ ^^ ^^                                          BC_jmpBoot: BOOT JUMP
-                   ^^ ^^ ^^ ^^ ^^  ^^ ^^ ^^                 BS_OEMName: MSDOS4.1
-                                            ^^ ^^           BPB_BytsPerSec: BYTES PER SECTOR: 0x0200 (512)
-                                                  ^^        BPB_SecPerClus: SECTORS PER CLUSTER: 8
+          ^^ ^^ ^^........................................  BC_jmpBoot: BOOT JUMP
+                   ^^ ^^ ^^ ^^ ^^  ^^ ^^ ^^...............  BS_OEMName: MSDOS4.1
+                                            ^^ ^^......... BPB_BytsPerSec: BYTES PER SECTOR: 0x0200 (512)
+                                                  ^^...... BPB_SecPerClus: SECTORS PER CLUSTER: 8
                                                      ^^ ^^  BPB_RsvdSecCnt: RESERVED SECTORS COUNT: 1 
 
 00000010: 02 20 00 00 00 F8 41 00  01 00 01 00 00 00 00 00  . ....A.........
 
-          ^^                                                BPB_NumFATs: FAT DATA STRUCTURES COUNT: 2
-             ^^ ^^                                          BPB_RootEntCnt: ROOT ENTRIES COUNT: 0x0002 (2).
+          ^^..............................................  BPB_NumFATs: FAT DATA STRUCTURES COUNT: 2
+             ^^ ^^........................................  BPB_RootEntCnt: ROOT ENTRIES COUNT: 0x0002 (2).
                                                              NOTE: FAt16 SHOULD USE VALUE 512!
-                   ^^ ^^                                    BPB_TotSec16 = 0. Total sector count on the volume.
+                   ^^ ^^..................................  BPB_TotSec16 = 0. Total sector count on the volume.
                                                              If 0 then BPB_TotSec32 must be non zero!
                                                              For FAT32 this must be 0. For FAT16 this value contains sector count and BPB_TotSect32=0 if total sector count fits in 0x10000.
-                         ^^                                 BPB_Media = 0xF8 (fixed non-removable).
+                         ^^...............................  BPB_Media = 0xF8 (fixed non-removable).
                                                              NOTE: 0xF0 is used for removable.
-                            ^^ ^^                           BPB_FATSz16 = 0x0041 (61). Sectors count occupied by one FAT.
+                            ^^ ^^.........................  BPB_FATSz16 = 0x0041 (61). Sectors count occupied by one FAT.
                                                              NOTE: On FAT32 volume BPB_FATSz32 must be zero.
-                                   ^^ ^^                    BPB_SecPerTrk = 0x0001. Sectors per track geometry.
-                                         ^^ ^^              BPB_NumHeads = 0x0001.
+                                   ^^ ^^..................  BPB_SecPerTrk = 0x0001. Sectors per track geometry.
+                                         ^^ ^^............  BPB_NumHeads = 0x0001.
                                                ^^ ^^ ^^ ^^  BPB_HiddSec = 0. Count of hidden sectors preceeding partition with FAT volume.
 
 00000020: 80 00 02 00 00 00 29 74  19 02 27 44 41 50 4C 49  ......)t..'DAPLI
          
-          ^^ ^^ ^^ ^^ ------------------------------------  BPB_TotSec32 = 0x00020080 (131200).
+          ^^ ^^ ^^ ^^.....................................  BPB_TotSec32 = 0x00020080 (131200).
 
 ---------------------------------------------------------   WARNING: FAT12/FAT16 and FAT32 STARTS TO DIFFER HERE!
 
@@ -45,16 +45,16 @@ Some initial analysis of filesystem bytes are provided below. Seems valid FAT16 
 
 00000020: 80 00 02 00 00 00 29 74  19 02 27 44 41 50 4C 49  ......)t..'DAPLI
 
-                      ^^ ---------------------------------  BS_DrvNum = 0 (floppy disk). 0x80 is a hard disk.
-                         ^^ ------------------------------  BS_Reserved1 = 0.
-                            ^^ ---------------------------  BS_BootSig = 0x29 (41). Signature stating that three fields in boot sector are present.
-                               ^^  ^^ ^^ ^^ - - - - - - -   BS_VolID = 0x27021974. Volume serial number.
+                      ^^..................................  BS_DrvNum = 0 (floppy disk). 0x80 is a hard disk.
+                         ^^...............................  BS_Reserved1 = 0.
+                            ^^............................  BS_BootSig = 0x29 (41). Signature stating that three fields in boot sector are present.
+                               ^^  ^^ ^^ ^^...............  BS_VolID = 0x27021974. Volume serial number.
                                             ^^ ^^ ^^ ^^ ^^  BS_VolLab[0:4] = "DAPLI".
 
 00000030: 4E 4B 2D 44 4E 44 46 41  54 31 36 20 20 20 00 00  NK-DNDFAT16   ..
 
-          ^^ ^^ ^^ ^^ ^^ ^^ ..............................  BS_VolLab[5:7] = "NK-DND".
-                            ^^ ^^  ^^ ^^ ^^ ^^ ^^ ^^ .....  BS_FilSysType = "FAT16   ". 
+          ^^ ^^ ^^ ^^ ^^ ^^...............................  BS_VolLab[5:7] = "NK-DND".
+                            ^^ ^^  ^^ ^^ ^^ ^^ ^^ ^^......  BS_FilSysType = "FAT16   ". 
  --- FAT32 ---
 
 00000020: 80 00 02 00 00 00 29 74  19 02 27 44 41 50 4C 49  ......)t..'DAPLI
@@ -92,8 +92,15 @@ Some initial analysis of filesystem bytes are provided below. Seems valid FAT16 
 
 000000E0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................
 000000F0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................
-...
 
+000001F0  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 .
+                                                    ^^ ^^  Bootloader Signature
+                                                            NOTE: Some fsck_msdos implementations expect those bytes to be 55 AA otherwise filesystem will be marked as broken !!!
+                                                            That was the case for Android implementation.
+
+000001F0  00 00 00 00 00 00 00 00 00 00 00 00 00 00 55 AA .U. <- THIS SIGNATURE IS MANDATORY FOR ANDROID/FSCK_MSDOS TO VALIDATE DRIVE!
+
+...
 
 000083E0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................
 000083F0: 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................
