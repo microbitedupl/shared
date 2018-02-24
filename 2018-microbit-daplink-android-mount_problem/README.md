@@ -1,12 +1,87 @@
 This repository holds information related to Microbit flashing via DAPLink UMS using Android OS as repoted in [1].
-DAPLink seems to be detected as corrupted drive by Android and OS offers to format the drive..
+DAPLink seems to be detected as corrupted drive by Android and OS offers to format the drive.
+
+# Problem
+
+DAPLink VFS firmware code was not setting 0xAA55 Boot Signature that `fsck_msdos` on Android considered a broken disk.
+
+Some sources say setting Boot Signature to 0x0000 will disable booting from that device. Booting was disabled by DAPLink developer that way probably because DAPLink / Microbit was blocking Operating System Boot on some machines while attached to USB port during PC power on.
+
+# Solution
+
+Reverting Boot Signature to 0xAA55 fixes problem and DAPLink / Microbit can now be read correctly by Android.
+
+In addition a dedicated bootloader code was developed to display error message on PC screen when DAPLink / Microbit blocks correct bootstrap of the host PC (see Bootloader section).
 
 # Resources
 
 * [usb_dumps/](usb_dumps/) contains USB dumps after Microbit attach to Android device,  corruption report, format offer and start. Dumps were made with Beagle480 USB Analyzer.
 * [disk_images/](disk_images/) contains Mass Storage Disk Image Dumps made with DD utility.
 
-# Analysis
+# Bootloader
+
+Simple x86 PC bootloader code was developed to display warning message if host PC accidentially boots off the USB DAPLink / Microbit:
+
+```
+     1                                  [BITS 16]
+     2                                  %define BLSTART 0x3E
+     3                                  %define BLLEN 448
+     4
+     5 00000000 FA                      cli
+     6 00000001 B8C007                  mov ax, 07C0h
+     7 00000004 052001                  add ax, 288
+     8 00000007 8ED0                    mov ss, ax
+     9 00000009 BC0010                  mov sp, 4096
+    10 0000000C B8C007                  mov ax, 07C0h
+    11 0000000F 8ED8                    mov ds, ax
+    12 00000011 BE[6D00]                mov si,message+BLSTART
+    13 00000014 E80B00                  call print
+    14 00000017 EBFE                    jmp $
+    15
+    16                                  printc:
+    17 00000019 B40E                        mov ah, 0x0E
+    18 0000001B B700                        mov bh, 0x00
+    19 0000001D B307                        mov bl, 0x07
+    20 0000001F CD10                        int 0x10
+    21 00000021 C3                          ret
+    22
+    23                                  print:
+    24                                      nextc:
+    25 00000022 8A04                            mov al, [si]
+    26 00000024 46                              inc si
+    27 00000025 08C0                            or al, al
+    28 00000027 7405                            jz return
+    29 00000029 E8EDFF                          call printc
+    30 0000002C EBF4                            jmp nextc
+    31                                      return:
+    32 0000002E C3                              ret
+    33
+    34 0000002F 504C45415345205245-     message db 'PLEASE REMOVE THE ARM MBED DAPLINK USB DEVICE AND REBOOT THE SYSTEM..', 0
+    35 00000038 4D4F56452054484520-
+    36 00000041 41524D204D42454420-
+    37 0000004A 4441504C494E4B2055-
+    38 00000053 534220444556494345-
+    39 0000005C 20414E44205245424F-
+    40 00000065 4F5420544845205359-
+    41 0000006E 5354454D2E2E00
+    42
+    43 00000075 00<rept>                times BLLEN-($-$$) db 0
+```
+
+Above assembly code can be compiled into binary and hex payload using below python script:
+
+```
+#!/usr/bin/env python
+import os
+os.system('nasm -f bin -o print.bin -l print.lst print.asm')
+print(open('print.lst','r').read())
+x=1
+for c in open('print.bin','rb').read():
+    print('0x%02X, '%c, end='' if x % 16 else '\n')
+    x+=1
+```
+
+# Disk Data Bytes Analysis
 
 Some initial analysis of filesystem bytes are provided below. Seems valid FAT16 bare disk with no MBR. Comparison of FAT32 required fields is also presented to show filesystem cannot be misinterpreted as FAT32..
 
@@ -181,3 +256,4 @@ Some initial analysis of filesystem bytes are provided below. Seems valid FAT16 
 ```
 
 [1] https://github.com/ARMmbed/DAPLink/issues/269
+
